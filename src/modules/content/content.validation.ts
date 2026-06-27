@@ -17,5 +17,8 @@ export const contentQuerySchema = z.object({
     limit: z.string().regex(/^\d+$/).optional(),
     sortBy: z.string().optional(),
     sortOrder: z.enum(['asc', 'desc']).optional(),
+    search: z.string().optional(),
+    dateRange: z.enum(['all', '24h', '7d', '30d']).optional(),
+    all: z.enum(['true', 'false']).optional(),
   }),
 });

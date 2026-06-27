@@ -4,6 +4,7 @@ import { catchAsync } from '../../utils/catchAsync';
 import { sendResponse } from '../../utils/sendResponse';
 import { getPaginationOptions } from '../../utils/pagination';
 import { Messages } from '../../constants/messages';
+import { AppError } from '../../utils/AppError';
 
 export class ContentController {
   /**
@@ -12,7 +13,8 @@ export class ContentController {
   public static getContent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const userId = req.auth!.userId;
-    const content = await ContentService.getContentById(id, userId);
+    const userRole = req.auth!.role;
+    const content = await ContentService.getContentById(id, userId, userRole);
 
     sendResponse(res, {
       statusCode: 200,
@@ -27,12 +29,19 @@ export class ContentController {
    */
   public static getAllContent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const userId = req.auth!.userId;
-    const { type, page, limit, sortBy, sortOrder } = req.query as any;
+    const userRole = req.auth!.role;
+    const { type, page, limit, sortBy, sortOrder, search, dateRange, all } = req.query as any;
     
+    const isAll = all === 'true';
+    if (isAll && userRole !== 'admin' && userRole !== 'manager') {
+      throw new AppError(Messages.FORBIDDEN, 403);
+    }
+
     const pagination = getPaginationOptions({ page, limit, sortBy, sortOrder });
     const { contents, total } = await ContentService.getAllContent(
       userId,
-      { type },
+      userRole,
+      { type, search, dateRange, all: isAll },
       pagination
     );
 
@@ -58,7 +67,8 @@ export class ContentController {
   public static updateContent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const userId = req.auth!.userId;
-    const updatedContent = await ContentService.updateContent(id, userId, req.body);
+    const userRole = req.auth!.role;
+    const updatedContent = await ContentService.updateContent(id, userId, userRole, req.body);
 
     sendResponse(res, {
       statusCode: 200,
@@ -74,7 +84,8 @@ export class ContentController {
   public static deleteContent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const userId = req.auth!.userId;
-    await ContentService.deleteContent(id, userId);
+    const userRole = req.auth!.role;
+    await ContentService.deleteContent(id, userId, userRole);
 
     sendResponse(res, {
       statusCode: 200,
