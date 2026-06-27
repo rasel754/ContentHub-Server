@@ -6,13 +6,13 @@ import { contentQuerySchema, updateContentSchema } from './content.validation';
 
 const router = Router();
 
-// Apply auth to all endpoints in this route file
-router.use(clerkAuthHandler, requireAuth);
+// Public GET endpoints (clerkAuthHandler parses token if it exists but does not block unauthenticated users)
+router.get('/', clerkAuthHandler, validateRequest(contentQuerySchema), ContentController.getAllContent);
+router.get('/:id', clerkAuthHandler, ContentController.getContent);
 
-router.get('/', validateRequest(contentQuerySchema), ContentController.getAllContent);
-router.get('/:id', ContentController.getContent);
-router.patch('/:id', validateRequest(updateContentSchema), ContentController.updateContent);
-router.delete('/:id', ContentController.deleteContent);
+// Protected modification endpoints (forces authenticated state)
+router.patch('/:id', clerkAuthHandler, requireAuth, validateRequest(updateContentSchema), ContentController.updateContent);
+router.delete('/:id', clerkAuthHandler, requireAuth, ContentController.deleteContent);
 
 export const contentRoutes = router;
 export default router;
