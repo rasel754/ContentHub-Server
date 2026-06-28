@@ -49,6 +49,15 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
+// Root welcome route
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    message: 'Welcome to the ContentHub API Server.',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // 7. Match-all 404 Route handler
 app.all('*', (req: Request, _res: Response, next: NextFunction) => {
   next(new AppError(`Route not found: ${req.method} ${req.originalUrl}`, 404));
