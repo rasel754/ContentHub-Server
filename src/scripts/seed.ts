@@ -5,6 +5,7 @@ import { Content } from '../modules/content/content.model';
 import { ChatSession, ChatMessage } from '../modules/chat/chat.model';
 import { UserRole } from '../constants/roles';
 import { ContentType, MessageRole } from '../constants/enums';
+import { clerkClient } from '@clerk/clerk-sdk-node';
 
 const seedDatabase = async (): Promise<void> => {
   try {
@@ -19,32 +20,72 @@ const seedDatabase = async (): Promise<void> => {
     await ChatMessage.deleteMany({});
     console.log('🧹 Cleared existing collections.');
 
-    // 1. Seed User Accounts
-    const adminUser = await User.create({
-      clerkId: 'user_admin_clerk_id_123',
-      email: 'admin@ai-assistant.com',
-      firstName: 'Admin',
-      lastName: 'Supervisor',
-      role: UserRole.ADMIN,
-      profileImageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde',
-    });
+    // 1. Sync and Seed User Accounts with Clerk
+    console.log('🔄 Syncing demo users with Clerk...');
+    const demoUsersData = [
+      {
+        email: 'admin@contenthub.ai',
+        password: 'Admin!Demo!Secure!Pass!2026',
+        firstName: 'Admin',
+        lastName: 'Demo',
+        role: UserRole.ADMIN,
+        profileImageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde',
+      },
+      {
+        email: 'manager@contenthub.ai',
+        password: 'Manager!Demo!Secure!Pass!2026',
+        firstName: 'Manager',
+        lastName: 'Demo',
+        role: UserRole.MANAGER,
+        profileImageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2',
+      },
+      {
+        email: 'user@contenthub.ai',
+        password: 'User!Demo!Secure!Pass!2026',
+        firstName: 'User',
+        lastName: 'Demo',
+        role: UserRole.USER,
+        profileImageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
+      }
+    ];
 
-    const standardUser = await User.create({
-      clerkId: 'user_normal_clerk_id_456',
-      email: 'john.doe@gmail.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      role: UserRole.USER,
-      profileImageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-    });
+    const seededUsers: Record<UserRole, any> = {} as any;
 
-    console.log(`👤 Seeded User profiles:
-    - Admin: ${adminUser.email} (Clerk ID: ${adminUser.clerkId})
-    - User: ${standardUser.email} (Clerk ID: ${standardUser.clerkId})`);
+    for (const data of demoUsersData) {
+      console.log(`Checking Clerk for user: ${data.email}...`);
+      const existingClerkUsers = await clerkClient.users.getUserList({ emailAddress: [data.email] });
+      if (existingClerkUsers.data.length > 0) {
+        console.log(`Deleting existing Clerk user: ${data.email}...`);
+        await clerkClient.users.deleteUser(existingClerkUsers.data[0].id);
+      }
+      
+      console.log(`Creating Clerk user: ${data.email}...`);
+      const newClerkUser = await clerkClient.users.createUser({
+        emailAddress: [data.email],
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        publicMetadata: { role: data.role },
+      });
+
+      console.log(`Seeding MongoDB user profile for: ${data.email}...`);
+      const dbUser = await User.create({
+        clerkId: newClerkUser.id,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        profileImageUrl: data.profileImageUrl,
+      });
+
+      seededUsers[data.role] = dbUser;
+    }
+
+    console.log('👤 Seeded all user profiles in MongoDB and Clerk.');
 
     // 2. Seed Content
     const sampleContent = await Content.create({
-      userId: standardUser.clerkId,
+      userId: seededUsers[UserRole.USER].clerkId,
       prompt: 'Why clean architecture matters',
       type: ContentType.BLOG,
       output: 'Clean Architecture segregates business logic from frameworks, making systems maintainable, testable, and robust against technological churn.',
@@ -59,7 +100,7 @@ const seedDatabase = async (): Promise<void> => {
 
     // 3. Seed Chat Thread
     const sampleSession = await ChatSession.create({
-      userId: standardUser.clerkId,
+      userId: seededUsers[UserRole.USER].clerkId,
       title: 'Coding Patterns Discussion',
     });
 
